@@ -1,0 +1,65 @@
+!mkdir -p ~/.kaggle
+!cp kaggle.json ~/.kaggle/
+!chmod 600 ~/.kaggle/kaggle.json
+!kaggle datasets download nguyentrongdai/vietnamese-currency
+!unzip vietnamese-currency.zip -d vietnamese-currency
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import os
+data_dir = '/content/vietnamese-currency/dataset'
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    validation_split=0.2,
+    rotation_range = 20,
+    zoom_range = 0.2,
+    horizontal_flip = True)
+train_generator = train_datagen.flow_from_directory(
+    data_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='categorical',
+    subset='training')
+val_generator = train_datagen.flow_from_directory(
+    data_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='categorical',
+    subset='validation')
+print("classes:",train_generator.class_indices)
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense,Dropout
+from keras.models import Sequential
+model = Sequential()
+model.add(Conv2D(32,(3,3),activation = 'relu', input_shape = (128,128,3)))
+model.add(MaxPooling2D(2,2))
+model.add(Conv2D(64,(3,3),activation = 'relu'))
+model.add(MaxPooling2D(2,2))
+model.add(Conv2D(128,(3,3),activation = 'relu'))
+model.add(MaxPooling2D(2,2))
+model.add(Flatten())
+model.add(Dense(128,activation = 'relu'))
+model.add(Dropout(0.5))
+model.add(Dense(12,activation = 'softmax')) # Changed to 12 units to match the number of classes
+model.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics = ['accuracy'])
+model.summary()
+model.fit(train_generator,
+          epochs = 20,
+          validation_data = val_generator)
+model.save("money_model.h5")
+print("✅ Model saved!")
+from google.colab import files
+files.download('money_model.h5')
+from keras.utils import load_img, img_to_array
+import matplotlib.pyplot as plt
+import numpy as np
+
+img=load_img('/content/2.png',target_size=(128,128))
+plt.imshow(img)
+img=img_to_array(img)
+img=img.reshape(1,128,128,3)
+img=img.astype('float32')
+img=img/255.0
+
+predictions = model.predict(img)
+print("Predicted probabilities:", predictions)
+predicted_class_index = np.argmax(predictions, axis=-1)
+print("Predicted class index:", predicted_class_index)
+print("classes:",train_generator.class_indices)
